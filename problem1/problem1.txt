@@ -1,6 +1,6 @@
 CS425: HW5 CUDA
 Cameron Hall, Arthur Wuterich
-11/22/1025
+11/22/2015
 Problem 1
 
 A.  
@@ -16,7 +16,7 @@ A.
     }
 
     To assign elements to each thread, I used the range (blockIdx.x * 2, (blockIdx+1) * 2). I chose this approach because it's simple and
-    allows each thread to run the exact same code.
+    introduces no additional control divergence.
 
 B.
     I will create 25 blocks with 1024 threads each.
