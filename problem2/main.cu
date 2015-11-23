@@ -6,8 +6,8 @@
 
 #include "support_code.hpp"
 
-const int N = 1000;
-const int SPLIT_SIZE = 1024;//pow(2,floor(log2(N))+1);
+const int N = 100000;
+const int SPLIT_SIZE = 1024;
 
 static void HandleError( cudaError_t err,
                          const char *file,
@@ -22,6 +22,7 @@ static void HandleError( cudaError_t err,
 
 __global__ void calculateFeatureSquareDifference(int *a, int *b, int *c, int N) {
  int tid = blockIdx.x; // handle the data at this index
+ printf("%d\n", tid);
  if (tid < N) {
    int diff = a[tid] - b[tid];
    c[tid] = diff * diff;
@@ -39,7 +40,6 @@ __global__ void reduce(int *a, int *b, int *c, int N) {
     int before = sdata[tid] = c[i];
     __syncthreads();
     //printf("Before Value: %d, Value in sdata - %d\n", before, sdata[tid]);
-
     //printf("tid = %d, i = %d, blockDim = (%d, %d), blockIdx = (%d, %d), threadIdx = (%d,%d), gridDim = (%d, %d)\n", tid, i, blockDim.x, blockDim.y, blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, gridDim.x, gridDim.y);
     //printf("1 - %d\n", sdata[0]);
     //printf("%d\n", tid);
@@ -88,7 +88,6 @@ int main(int argc, char** argv) {
 
   HANDLE_ERROR(cudaMemcpy(dev_a, A, N * sizeof(int), cudaMemcpyHostToDevice));
   HANDLE_ERROR(cudaMemcpy(dev_b, B, N * sizeof(int), cudaMemcpyHostToDevice));
-  HANDLE_ERROR(cudaMemcpy(dev_c, C, N * sizeof(int), cudaMemcpyHostToDevice));
 
   calculateFeatureSquareDifference<<<N,1>>>(dev_a, dev_b, dev_c, N);
 
@@ -112,7 +111,6 @@ int main(int argc, char** argv) {
   }
   reduce<<<numBlocks,blockSize,memorySize>>>(dev_a, dev_b, dev_c, N);
   HANDLE_ERROR(cudaMemcpy(C, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost));
-  //cudaDeviceSynchronize();
   /*
   for(int i = 0; i < N; ++i) {
     gpuDistanceTotal += C[i];
