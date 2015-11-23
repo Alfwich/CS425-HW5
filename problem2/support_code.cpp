@@ -6,7 +6,7 @@ void InitArray(int A[], int N) {
   }
 }
 
-double ComputeDistance(int A[], int B[], int N) {
+int ComputeDistanceRaw(int A[], int B[], int N) {
   int total = 0;
 
   for(int i = 0; i < N; ++i) {
@@ -14,5 +14,9 @@ double ComputeDistance(int A[], int B[], int N) {
     total += (diff*diff);
   }
 
-  return sqrt(total);
+  return total;
+}
+
+double ComputeDistance(int A[], int B[], int N) {
+  return sqrt(ComputeDistanceRaw(A,B,N));
 }

@@ -6,8 +6,9 @@
 
 #include "support_code.hpp"
 
-const int N = 100000;
+const int N = 100000000;
 const int SPLIT_SIZE = 1024;
+const int ITERATION_SIZE = 3000;
 
 static void HandleError( cudaError_t err,
                          const char *file,
@@ -22,7 +23,7 @@ static void HandleError( cudaError_t err,
 
 __global__ void calculateFeatureSquareDifference(int *a, int *b, int *c, int N) {
  int tid = blockIdx.x; // handle the data at this index
- printf("%d\n", tid);
+ //printf("%d\n", tid);
  if (tid < N) {
    int diff = a[tid] - b[tid];
    c[tid] = diff * diff;
@@ -73,56 +74,71 @@ __global__ void reduce(int *a, int *b, int *c, int N) {
 int main(int argc, char** argv) {
   //std::srand(time(0));
   std::srand(0);
+  unsigned long cpuDistanceTotal = 0L,
+                gpuHostDistanceTotal = 0L,
+                gpuDeviceDistanceTotal = 0L;
 
   int *dev_a, *dev_b, *dev_c;
-  HANDLE_ERROR(cudaMalloc( (void**)&dev_a, N * sizeof(int) ));
-  HANDLE_ERROR(cudaMalloc( (void**)&dev_b, N * sizeof(int) ));
-  HANDLE_ERROR(cudaMalloc( (void**)&dev_c, N * sizeof(int) ));
+  HANDLE_ERROR(cudaMalloc( (void**)&dev_a, ITERATION_SIZE * sizeof(int) ));
+  HANDLE_ERROR(cudaMalloc( (void**)&dev_b, ITERATION_SIZE * sizeof(int) ));
+  HANDLE_ERROR(cudaMalloc( (void**)&dev_c, ITERATION_SIZE * sizeof(int) ));
+  int *A = (int*)malloc(sizeof(int)*ITERATION_SIZE);
+  int *B = (int*)malloc(sizeof(int)*ITERATION_SIZE);
+  int *C = (int*)malloc(sizeof(int)*ITERATION_SIZE);
+  for(int i = 0; i < N ;i += ITERATION_SIZE) {
+    int computationBlockSize = ITERATION_SIZE;
+    if( i + ITERATION_SIZE >= N ) {
+      computationBlockSize = ITERATION_SIZE - (i+ITERATION_SIZE - N);
+    }
+    if(computationBlockSize <= 0) {
+      break;
+    }
+    //std::cout << "Computation block size: " << computationBlockSize << ", Running Totals: " << cpuDistanceTotal << ", " << gpuHostDistanceTotal << ", " << gpuDeviceDistanceTotal << std::endl;
 
-  int *A = (int*)malloc(sizeof(int)*N);
-  int *B = (int*)malloc(sizeof(int)*N);
-  int *C = (int*)malloc(sizeof(int)*N);
 
-  InitArray(A, N);
-  InitArray(B, N);
+    InitArray(A, computationBlockSize);
+    InitArray(B, computationBlockSize);
 
-  HANDLE_ERROR(cudaMemcpy(dev_a, A, N * sizeof(int), cudaMemcpyHostToDevice));
-  HANDLE_ERROR(cudaMemcpy(dev_b, B, N * sizeof(int), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(dev_a, A, computationBlockSize * sizeof(int), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(dev_b, B, computationBlockSize * sizeof(int), cudaMemcpyHostToDevice));
 
-  calculateFeatureSquareDifference<<<N,1>>>(dev_a, dev_b, dev_c, N);
+    calculateFeatureSquareDifference<<<computationBlockSize,1>>>(dev_a, dev_b, dev_c, computationBlockSize);
 
-  HANDLE_ERROR(cudaMemcpy(C, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost));
+    HANDLE_ERROR(cudaMemcpy(C, dev_c, computationBlockSize * sizeof(int), cudaMemcpyDeviceToHost));
 
-  double gpuDistanceTotal = 0.0;
-  for(int i = 0; i < N; ++i) {
-    gpuDistanceTotal += C[i];
-    //std::cout << C[i] << " ";
+    double gpuDistanceTotal = 0.0;
+    for(int i = 0; i < computationBlockSize; ++i) {
+      gpuDistanceTotal += C[i];
+      //std::cout << C[i] << " ";
+    }
+    //std::cout << std::endl;
+
+    gpuHostDistanceTotal += gpuDistanceTotal;
+    cpuDistanceTotal += ComputeDistanceRaw(A, B, computationBlockSize);
+
+    int numBlocks = computationBlockSize/SPLIT_SIZE,
+        blockSize = SPLIT_SIZE,
+        memorySize = sizeof(int)*SPLIT_SIZE;
+    if(computationBlockSize % SPLIT_SIZE != 0) {
+      numBlocks += 1;
+    }
+    reduce<<<numBlocks,blockSize,memorySize>>>(dev_a, dev_b, dev_c, computationBlockSize);
+    HANDLE_ERROR(cudaMemcpy(C, dev_c, computationBlockSize * sizeof(int), cudaMemcpyDeviceToHost));
+    /*
+    for(int i = 0; i < N; ++i) {
+      gpuDistanceTotal += C[i];
+      std::cout << C[i] << " ";
+    }
+    std::cout << std::endl;
+    */
+
+    gpuDeviceDistanceTotal += C[0];
+
   }
-  //std::cout << std::endl;
 
-  double gpuDistance = sqrt(gpuDistanceTotal);
-  double actualDistance = ComputeDistance(A, B, N);
-
-  int numBlocks = N/SPLIT_SIZE,
-      blockSize = SPLIT_SIZE,
-      memorySize = sizeof(int)*SPLIT_SIZE;
-  if(N % SPLIT_SIZE != 0) {
-    numBlocks += 1;
-  }
-  reduce<<<numBlocks,blockSize,memorySize>>>(dev_a, dev_b, dev_c, N);
-  HANDLE_ERROR(cudaMemcpy(C, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost));
-  /*
-  for(int i = 0; i < N; ++i) {
-    gpuDistanceTotal += C[i];
-    std::cout << C[i] << " ";
-  }
-  std::cout << std::endl;
-  */
-
-  double deviceDistance = sqrt(C[0]); // Some way to get the reduction distance
-  std::cout << "Host result: " << actualDistance << std::endl;
-  std::cout << "CUDA result with host reduction: " << gpuDistance << std::endl;
-  std::cout << "CUDA result with device reduction: " << deviceDistance << std::endl;
+  std::cout << "Host result: " << sqrt(cpuDistanceTotal) << std::endl;
+  std::cout << "CUDA result with host reduction: " << sqrt(gpuHostDistanceTotal) << std::endl;
+  std::cout << "CUDA result with device reduction: " << sqrt(gpuDeviceDistanceTotal) << std::endl;
 
   cudaFree(dev_a);
   cudaFree(dev_b);

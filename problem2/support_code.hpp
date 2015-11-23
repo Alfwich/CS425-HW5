@@ -6,5 +6,6 @@
 
 void InitArray(int A[], int N);
 double ComputeDistance(int A[], int B[], int N);
+int ComputeDistanceRaw(int A[], int B[], int N);
 
 #endif /* end of include guard:  */
