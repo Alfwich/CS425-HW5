@@ -1,0 +1,14 @@
+CS425: HW5 CUDA
+Cameron Hall, Arthur Wuterich
+11/22/2015
+Problem 2: Divergences
+
+There are three divergences
+ Line 55:
+  This will divergence when there are more threads allocated than the problem size
+
+ Line 63:
+  There will be divergence where only one thread will perform the addition based on the condition
+
+ Line 76:
+  There will be divergence where the first block and thread will perform the final collection of the local block sums and produce the final result
