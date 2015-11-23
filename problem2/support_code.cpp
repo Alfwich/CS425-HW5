@@ -1,4 +1,5 @@
 #include "support_code.hpp"
+#include <cstdlib>
 
 // Fills the provided array with random values between [0,99]
 // Precondition: srand has been called
