@@ -49,11 +49,14 @@ __global__ void reduce(int *a, int *b, int *c, int N) {
   // each thread loads one element from global to shared mem
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-  sdata[tid] = (i<N) ? c[i] : 0; // Zero out the shared memory in case i < N
-  __syncthreads();
+  sdata[tid] = 0;
 
   // Only complete the reduction if within the problem size
   if( i < N ) {
+    // Calculate this threads squared difference
+    int diff = a[i] - b[i];
+    sdata[tid] = diff*diff;
+    __syncthreads();
 
     // do reduction in shared mem
     for(unsigned int s=1; s < blockDim.x; s *= 2) {
@@ -63,7 +66,7 @@ __global__ void reduce(int *a, int *b, int *c, int N) {
       __syncthreads();
     }
 
-    // write result for this block to global mem
+    // write result for this block to c totals array
     if (tid == 0) {
       c[blockIdx.x] = sdata[0];
     }
