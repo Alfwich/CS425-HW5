@@ -122,7 +122,6 @@ int main(int argc, char** argv) {
       gpuDistanceTotal += C[i];
     }
 
-
     // Determine the offsets for the GPU reduction
     int numBlocks = (computationBlockSize/SPLIT_SIZE)+1,
         blockSize = SPLIT_SIZE,
@@ -139,7 +138,6 @@ int main(int argc, char** argv) {
     gpuHostDistanceTotal += gpuDistanceTotal;
     cpuDistanceTotal += ComputeDistanceRaw(A, B, computationBlockSize);
     gpuDeviceDistanceTotal += C[0];
-
   }
 
   // Output the totals
