@@ -1,4 +1,5 @@
 #include "support_code.hpp"
+#include <cstdlib>
 
 void InitArray(int A[], int N) {
   for(int i = 0; i < N; ++i) {
